@@ -3,110 +3,100 @@ import os
 import argparse
 import pandas as pd
 import numpy as np
-from itertools import combinations
 import table
+import utils
 
 # TODO:
-    # Input Validity?
+    # Tests
+    # Input validity?
+    # Print information along the way? How the data has been cleaned, completion percentage etc.
 
-class TableKeyColumns():
+class KeyColumn():
     
     def __init__(self, columns, filename):
         self.columns = columns
         self.filename = filename
 
+    # prints candidates nicely
     def print(self):
-        print("Candidates for the key column of " + self.filename + " are:")
-        print(self.columns)
+        print(f"Candidates for the key column of {self.filename} are: ", end="")
+        print(*self.columns, sep=", ")
 
+def check_combination(tbl, combinations_with_values, key_found):
+    """ Check if values in every row of a combination of columns is unique.
+    """
 
-def print_key_columns(key_columns_all_tables):
-    for key_columns_specific_table in key_columns_all_tables:
-        key_columns_specific_table.print()
-
-def all_unique(values):
-    s = set()
-    return not any(i in s or s.add(i) for i in values)
-
-def find_key_column_candidates(tbl, combinations_with_values, key_found):
-    key_column_candidates = []
+    candidates = []
     # Check for uniqueness
-    for combination in combinations_with_values:
-            if all_unique(combinations_with_values[combination]):
-                key_column_candidates.append(combination)
+    for combination in combinations_with_values:    
+            if utils.all_unique(combinations_with_values[combination]):
+                candidates.append(combination)
                 key_found = True
 
-    return key_column_candidates, key_found
+    return candidates, key_found
 
 def find_combination_values(combinations_list, tbl, combination_size):
+    """ For each combination of columns, get the values in each row and zip them together.
+    """
     combinations_with_values = {}
     # For each combination, zip together the values for each row in the combination
     for combination in combinations_list:
         values = []
         # Getting all the values to be zipped
         for i in range(combination_size):
-            values.append(tbl.df[combination[i]])
+            if combination_size == 1:
+                values.append(combination)
+            else:
+                values.append(tbl.df[combination[i]])
         combinations_with_values[combination] = list(zip(*values))
 
     return combinations_with_values
 
-def generate_combinations(tbl, combination_size):
-    # Generate list of column combinations of size combination_size
-    combinations_list = list(combinations(tbl.df.columns, combination_size))
-
-    return combinations_list
-
 def clean_data(tbl):
-    tbl.remove_columns_containing_empty_cells()
+
+    # An empty cell can't be used as a key
+    tbl.remove_nan_columns()
+
+    # Even a single duplicate row would result in no key columns.
     tbl.remove_duplicates()
 
-# Idea: Check all columns for uniqueness, then check all pairs of columns for uniqueness etc. until key column(s) found.
-def find_key_columns_specific_table(tbl):
-
-    # Remove columns that contain empty cells, and duplicate rows
-    clean_data(tbl)
-
-    # Setup
-    key_found = False
-    combination_size = 2
-    number_of_columns = len(tbl.df.columns)
-
-    while not key_found and combination_size <= number_of_columns:
-
-        combinations_list \
-            = generate_combinations(tbl, combination_size)
-        combinations_with_values \
-            = find_combination_values(combinations_list, tbl, combination_size)
-        key_column_candidates, key_found \
-            = find_key_column_candidates(tbl, combinations_with_values, key_found)
-
-        combination_size = combination_size + 1
-
-    return key_column_candidates
-
-def find_key_columns_all_tables(tables):
+def find_key_column_candidates(tables, verbose=True):
+    """ Idea: Check all columns for uniqueness, then check all pairs of columns for uniqueness etc. until key column(s) found.
+    """
     
     #Setup
-    key_columns_all_tables = []
+    key_column_candidates = []
 
     for tbl in tables:
-        key_column_candidates = find_key_columns_specific_table(tbl)
-        key_columns_all_tables.append(TableKeyColumns(key_column_candidates, tbl.filename))
 
-    return key_columns_all_tables
+        # Remove duplicate rows and columns that contain empty cells
+        clean_data(tbl)
 
-def generate_tables(location):
-    # if the destination points to a single csv file
-    if location.endswith(".csv"):
-        tables = [table.Table(location)]
-    # otherwise it's a directory
-    else:
-        tables = []
-        for file in os.listdir(location):
-            if file.endswith(".csv"):
-                tables.append(table.Table(os.path.join(location , file)))
+        # Setup
+        key_found = False
+        combination_size = 1
+        number_of_columns = len(tbl.df.columns)
+
+        while not key_found and combination_size <= number_of_columns:
+            
+            # get a list of all possible combinations
+            combinations_list \
+                = utils.generate_combinations(tbl.df.columns, combination_size)
+            # for those combinations, get the values
+            combinations_with_values \
+                = find_combination_values(combinations_list, tbl, combination_size)
+            # check those combinations of values for uniqueness across all rows
+            candidates, key_found \
+                = check_combination(tbl, combinations_with_values, key_found)
+            
+            combination_size = combination_size + 1
     
-    return tables
+        key_columns = KeyColumn(candidates, tbl.filename)
+        key_column_candidates.append(key_columns)
+        if verbose:
+            key_columns.print()
+
+    return key_column_candidates
 
 def parse_arguments(*args):
     parser = argparse.ArgumentParser()
@@ -118,11 +108,12 @@ def parse_arguments(*args):
     return args.location
 
 def main(*args):
+
+    # location of csv files to process
     location = parse_arguments(*args)
-    tables = generate_tables(location)
-    key_columns_all_tables = find_key_columns_all_tables(tables)
+    tables = utils.generate_tables(location)
     
-    print_key_columns(key_columns_all_tables)
+    find_key_column_candidates(tables)
 
 if __name__ == '__main__':
     main(*sys.argv[1:])

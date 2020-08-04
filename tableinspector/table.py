@@ -9,12 +9,15 @@ class Table():
         self.original_df = self.df.copy()
         self.filename = os.path.basename(location)
 
-    # Removes any columns that contain an empty cell
-    def remove_columns_containing_empty_cells(self):
+    def remove_nan_columns(self):
+        """ Removes any columns that contain a nan
+        """
+
         for column in self.df.columns:
             if self.df[column].isna().values.any():
                 self.df = self.df.drop(column, axis=1)
 
-    # Removes all duplicate rows, keeping the first occurence
     def remove_duplicates(self):
+        """ Removes all duplicate rows, keeping the first occurence
+        """
         self.df = self.df.drop_duplicates()

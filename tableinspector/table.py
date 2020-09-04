@@ -21,3 +21,17 @@ class Table():
         """ Removes all duplicate rows, keeping the first occurence
         """
         self.df = self.df.drop_duplicates()
+
+    def remove_unique_columns(self):
+        """ Remove any columns that are completely unique
+        """
+
+        for column in self.df.columns:
+            if self.df[column].is_unique:
+                self.df = self.df.drop(column, axis=1)
+
+    def remove_single_value_columns(self):
+
+        for column in self.df.columns:
+            if len(self.df[column].unique()) == 1:
+                self.df = self.df.drop(column, axis=1)

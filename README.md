@@ -13,7 +13,7 @@ Does this up to maximum size combination of columns.
 
 ## Testing
 
-Testing is done using the 'unittest' library.
+Testing is done using the 'unittest' library. All test files start with the 'test_' prefix, and testing data is contained in the test_data directory.
 
 ## Running Programs
 
